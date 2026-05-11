@@ -1,0 +1,23 @@
+{
+  "whitelist": [
+    "customers",
+    "products",
+    "transactions",
+    "users"
+  ],
+  "blacklist": [
+    "audit_trail",
+    "migrations",
+    "schema_migrations",
+    "typeorm_metadata"
+  ],
+  "envFile": ".env.staging",
+  "envMapping": {
+    "host": "DB_HOST",
+    "port": "DB_PORT",
+    "database": "DB_NAME",
+    "user": "DB_USER",
+    "password": "DB_PASSWORD",
+    "schema": "public"
+  }
+}
