@@ -4,11 +4,12 @@ A small Express + PostgreSQL service used as a sandbox for exercising the [`@sta
 
 ## Branches
 
-This repository keeps multiple variants of the same app on separate branches so each integration depth can be compared side by side:
+Two variants of the same app live side by side so they can be compared:
 
-- **`main`** *(this branch — the baseline)*. JWT auth, audit columns on the data tables, hard deletes. The `audit_trail` table is populated by triggers, but `changed_by` falls back to the Postgres role because this branch does not push the JWT user into the database session.
-- **`feat/audit-actor-context`**. Adds a `withAuditUser` helper that sets a Postgres session variable before each write, so `audit_trail.changed_by` reflects the JWT user instead of the database role.
-- **`feat/soft-delete`**. Replaces hard delete with `deleted_at` / `deleted_by` soft delete. Reads filter out soft-deleted rows; references are validated against live rows only.
+- **`feat/hard-delete`** *(this branch — the baseline)*. JWT auth, audit columns on the data tables, and hard deletes that remove rows outright.
+- **`feat/soft-delete`**. Same app, but `DELETE` endpoints flip `deleted_at` / `deleted_by` instead of removing the row. Reads filter out soft-deleted rows; references on `POST /transactions` are validated against live rows only.
+
+In both branches, `audit_trail` is populated by triggers, but `changed_by` falls back to the Postgres role (e.g. `'postgres'`) because neither branch pushes the JWT user into the database session. That extra plumbing is intentionally out of scope here — adding it requires a small `set_config('audit.user', …, true)` helper around every write.
 
 ## Stack
 
@@ -66,7 +67,7 @@ npx audit-trail check                                      # verify
 
 Every INSERT/UPDATE/DELETE on those three tables now writes a row to `audit_trail`.
 
-**On this branch**, `audit_trail.changed_by` will show the Postgres role (e.g. `'postgres'`) for every change. To get JWT-user attribution, switch to `feat/audit-actor-context`.
+`audit_trail.changed_by` will show the Postgres role (e.g. `'postgres'`) for every change — the JWT user identity is not pushed into the database session on either branch.
 
 ## Schema
 
@@ -149,7 +150,7 @@ ORDER BY changed_at DESC
 LIMIT 10;
 ```
 
-You'll see one `INSERT` and one `DELETE` row, both attributed to `changed_by = 'postgres'`. To attribute them to the JWT user, switch to `feat/audit-actor-context`.
+You'll see one `INSERT` and one `DELETE` row, both attributed to `changed_by = 'postgres'`.
 
 ## File layout
 
