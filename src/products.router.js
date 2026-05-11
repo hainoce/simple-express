@@ -4,16 +4,21 @@ const { requireAuth, requireAdmin } = require('./auth.middleware');
 
 const router = express.Router();
 
-// GET /products — list all products
+// GET /products — list all (non-deleted) products
 router.get('/', async (_req, res) => {
-  const result = await pool.query('SELECT * FROM products ORDER BY id');
+  const result = await pool.query(
+    'SELECT * FROM products WHERE deleted_at IS NULL ORDER BY id'
+  );
   return res.json(result.rows);
 });
 
-// GET /products/:id — fetch one product
+// GET /products/:id — fetch one (non-deleted) product
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+  const result = await pool.query(
+    'SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL',
+    [id]
+  );
 
   if (result.rows.length === 0) {
     return res.status(404).json({ error: 'Product not found' });
@@ -42,30 +47,23 @@ router.post('/', requireAuth, async (req, res) => {
   return res.status(201).json(result.rows[0]);
 });
 
-// DELETE /products/:id — admin-only
+// DELETE /products/:id — admin-only soft delete.
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
-  try {
-    const result = await pool.query(
-      'DELETE FROM products WHERE id = $1 RETURNING *',
-      [id]
-    );
+  const result = await pool.query(
+    `UPDATE products
+        SET deleted_at = NOW(), deleted_by = $2
+      WHERE id = $1 AND deleted_at IS NULL
+      RETURNING *`,
+    [id, req.user.userId]
+  );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    return res.json({ deleted: result.rows[0] });
-  } catch (err) {
-    // Postgres FK violation — product is referenced by transactions.
-    if (err.code === '23503') {
-      return res.status(409).json({
-        error: 'Cannot delete product — it appears in existing transactions',
-      });
-    }
-    throw err;
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Product not found' });
   }
+
+  return res.json({ deleted: result.rows[0] });
 });
 
 module.exports = router;

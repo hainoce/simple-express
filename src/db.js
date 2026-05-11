@@ -69,6 +69,14 @@ const initDb = async () => {
     await pool.query(
       `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`
     );
+    await pool.query(
+      `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`
+    );
+    await pool.query(
+      `ALTER TABLE ${table}
+         ADD COLUMN IF NOT EXISTS deleted_by INTEGER
+           REFERENCES users(id) ON DELETE SET NULL`
+    );
   }
 
   // ── updated_at trigger ──────────────────────────────────────────
